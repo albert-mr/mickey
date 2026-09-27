@@ -87,19 +87,22 @@ local function micElements(x, y, s, fg, bg, muted)
   return el
 end
 
--- Center x of our menu bar icon and the y just under the menu bar of that screen.
+-- Where the bezel goes: on the screen with the focused window (where you are looking,
+-- also in fullscreen, where the menu bar is hidden), at our icon's distance from the
+-- right edge, so it hangs under the icon whenever the menu bar is visible.
 local function anchor()
-  local f = bar:frame()
-  if not f or f.x <= 0 then   -- item not in the bar: see README, "Allow in the Menu Bar"
-    local s = hs.screen.mainScreen():frame()
-    return s.x + s.w - 120, s.y + HUD.gap
+  local scr = hs.screen.mainScreen()
+  local sf, f, fromRight = scr:frame(), bar:frame(), 120
+  if f and f.x > 0 then   -- otherwise the item is not in the bar: README, "Allow in the Menu Bar"
+    local best = math.huge
+    for _, s in ipairs(hs.screen.allScreens()) do   -- the icon's own screen: contains f.x, nearest top edge
+      local ff = s:fullFrame()
+      if f.x >= ff.x and f.x <= ff.x + ff.w and math.abs(ff.y - f.y) < best then
+        best, fromRight = math.abs(ff.y - f.y), ff.x + ff.w - (f.x + f.w / 2)
+      end
+    end
   end
-  local cx, scr, best = f.x + f.w / 2, hs.screen.mainScreen(), math.huge
-  for _, sc in ipairs(hs.screen.allScreens()) do   -- the screen whose top edge holds the item
-    local ff = sc:fullFrame()
-    if cx >= ff.x and cx <= ff.x + ff.w and math.abs(ff.y - f.y) < best then scr, best = sc, math.abs(ff.y - f.y) end
-  end
-  return cx, scr:frame().y + HUD.gap
+  return sf.x + sf.w - fromRight, sf.y + HUD.gap
 end
 
 local hud, hudTimer

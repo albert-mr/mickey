@@ -8,7 +8,7 @@ Turn the 🎤 key (F5) on your MacBook into a real microphone switch.
 - **Always on**: it runs inside Hammerspoon, which starts at login. No app window, no dock icon.
 
 <p align="center">
-  <b>Microphone Muted</b> · slashed mic glyph in a dark card under the icon · <b>Microphone On</b>
+  <img src="docs/bezel.png" width="400" alt="menu bar with a slashed mic icon and, under it, a dark card reading Microphone Muted">
 </p>
 
 ## Why not just mute in Meet?
