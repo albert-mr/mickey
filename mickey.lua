@@ -38,12 +38,13 @@ local function apply(d)
 end
 
 -- What the hardware says right now. No device counts as muted.
-function M.readState()
-  local d = dev(); if not d then return true end
+local function stateOf(d)
+  if not d then return true end
   local m = d:inputMuted()
   if m ~= nil then return m end
   return (d:inputVolume() or 1) == 0
 end
+function M.readState() return stateOf(dev()) end
 
 ---------------------------------------------------------------- feedback
 local sounds = {}
@@ -171,15 +172,17 @@ end
 hs.hotkey.bind({}, "f18", M.onDown, M.onUp)   -- no repeatfn: key repeats are ignored
 bar:setClickCallback(function() M.set(not M.muted) end)
 
--- default input changed (AirPods, USB mic): keep the new device in the same state
-hs.audiodevice.watcher.setCallback(function(event)
-  if event ~= "dIn " then return end
-  local d = dev()
-  if not apply(d) and d then hs.alert.show("mickey: cannot mute " .. d:name()) end
+-- default input changed (AirPods, USB mic): keep the new device in the same state,
+-- touching it only when it disagrees (a live mic keeps its own gain). `false` = no device.
+function M.onDeviceChange(d)
+  if d == nil then d = dev() end
+  if not d then M.muted = true; refreshBar(); return end
+  if stateOf(d) ~= M.muted and not apply(d) then hs.alert.show("mickey: cannot mute " .. d:name()) end
   refreshBar()
-end)
-hs.audiodevice.watcher.start()
+end
 
 M.muted = M.readState()   -- trust the hardware, not a default
 refreshBar()
+hs.audiodevice.watcher.setCallback(function(event) if event == "dIn " then M.onDeviceChange() end end)
+hs.audiodevice.watcher.start()
 return M
