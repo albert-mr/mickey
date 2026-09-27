@@ -95,9 +95,9 @@ Two already-running programs, one new file.
   `mic.slash` when muted. Click toggles. No dropdown. User cmd-drags it once
   next to the sound icon; macOS remembers.
 - Icon source: `hs.image.imageFromName` with SF Symbol names if Hammerspoon
-  1.1.1 resolves them; otherwise the AppKit named images
-  `NSTouchBarAudioInputTemplate` / `NSTouchBarAudioInputMuteTemplate`;
-  otherwise draw in canvas. Decided by the first implementation task.
+  1.1.1 resolves them; otherwise the same canvas mic drawing the HUD uses,
+  rendered as an 18 pt template image. Decided by the first implementation
+  task's probe.
 
 ### 4. Files and install
 
