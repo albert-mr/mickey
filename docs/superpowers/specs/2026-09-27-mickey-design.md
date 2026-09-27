@@ -5,7 +5,9 @@ Date: 2026-09-27. Status: approved design, pre-implementation.
 ## Goal
 
 Make the 🎤 key (F5) on the MacBook Pro a physical-style microphone switch.
-Press: the mic is muted at the OS level. Press again: live. Meeting apps
+Tap: the mic is muted at the OS level. Tap again: live. Hold: the mic is
+temporarily inverted for as long as the key is held (push-to-talk while
+muted, quick mute while live). Each press clicks. Meeting apps
 (Meet, Zoom, Teams) see an open mic sending silence and show no "muted"
 badge. Feedback looks native: a bezel like the volume HUD on each press, and
 a menu bar icon that shows state and toggles on click. Runs at every boot
@@ -13,8 +15,6 @@ with no window and no dock icon.
 
 ## Non-goals (deferred)
 
-- Push-to-talk / hold mode.
-- Click sound on toggle.
 - Persisting mute state across reboot.
 - Background blur on the HUD (Hammerspoon cannot do vibrancy). If it matters
   later, that is the trigger to rewrite as a native Swift app.
@@ -49,7 +49,8 @@ Two already-running programs, one new file.
 - `karabiner.json`, profile "Default profile", `fn_function_keys`: add
   `{"from":{"key_code":"f5"},"to":[{"key_code":"f18"}]}` beside the existing
   f4/f6 entries. 🎤 becomes F18 system-wide. `fn+F5` stays a real F5.
-- `mickey.lua`: `hs.hotkey.bind({}, "f18", toggle)`.
+- `mickey.lua`: `hs.hotkey.bind({}, "f18", onDown, onUp)`. Key repeat
+  events are ignored.
 - Manual step (user): move Wispr Flow's hotkey off the 🎤 key in its
   settings.
 
@@ -60,8 +61,16 @@ Two already-running programs, one new file.
   flag, so `dev:setInputMuted(muted)`. Otherwise fall back to volume: on
   mute remember `dev:inputVolume()` and set 0; on unmute restore it (default
   to 75 if the remembered value is 0 or nil).
-- `toggle()`: flip `muted`, `apply(defaultInputDevice)`, refresh HUD and
-  icon.
+- `set(m)`: `muted = m`, `apply(defaultInputDevice)`, refresh HUD and
+  icon, play the click for the new state.
+- Tap vs hold, one key:
+  - `onDown`: record the time, `set(not muted)`. The mic flips instantly
+    either way, so a hold has no delay before you can talk.
+  - `onUp`: if held less than `HOLD_MS` (250) it was a tap, keep the new
+    state. Otherwise it was a hold: `set(not muted)` again to revert.
+  - Result: tap = toggle, hold = temporary invert (push-to-talk while
+    muted, quick mute while live). `HOLD_MS` is a constant at the top of
+    the file.
 - Device watcher: `hs.audiodevice.watcher` on the default-input-changed
   event (`dIn `) re-applies `muted` to the new device. Switching to AirPods
   cannot silently unmute you.
@@ -69,6 +78,11 @@ Two already-running programs, one new file.
   hardware, do not assume.
 
 ### 3. Feedback
+
+- Click sound: `hs.sound` plays a system sound from
+  `/System/Library/Sounds/` on every state change, one sound for mute, a
+  different one for live, at volume 0.3. Local output only; the call never
+  hears it. Sound names are constants at the top of the file.
 
 - HUD: an `hs.canvas` bezel showing a mic icon (live) or mic-slash icon
   (muted). Geometry, position, corner radius, translucency and fade timing
@@ -117,9 +131,12 @@ real Meet call: quit it, remove from login items,
 - `check.sh`: reads state, toggles, asserts the default input device's
   mute/volume flipped, toggles back, asserts restored. Exit non-zero on
   failure.
-- Manual acceptance: in a Google Meet call, press 🎤. Meet shows no mute
-  badge, the other side hears silence. Press again, audio returns. HUD and
-  icon match state each time.
+- `check.sh` also drives `onDown`/`onUp` directly: down+up within 250 ms
+  flips state; down, wait 400 ms, up leaves state unchanged.
+- Manual acceptance: in a Google Meet call, tap 🎤. Meet shows no mute
+  badge, the other side hears silence. Tap again, audio returns. Hold while
+  muted: the other side hears you until release. HUD, icon and click match
+  state each time.
 - Device switch: mute, connect AirPods, confirm still muted on AirPods.
 
 ## Boot behavior
