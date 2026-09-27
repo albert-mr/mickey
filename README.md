@@ -1,47 +1,94 @@
 # mickey
 
-The 🎤 key (F5) on the MacBook Pro as a hardware-style mic switch.
+Turn the 🎤 key (F5) on your MacBook into a real microphone switch.
 
-- Tap: mute / unmute the mic at the OS level. Meet, Zoom and Teams see an open mic sending silence, no "muted" badge.
-- Hold: temporarily invert while held (push-to-talk while muted, quick mute while live).
-- Compact bezel under the menu bar icon (mic glyph + "Microphone Muted" / "Microphone On"), styled like the macOS 26 volume HUD. Menu bar icon (click toggles). Click sound.
+- **Tap**: mute or unmute the mic at the operating-system level. Google Meet, Zoom and Teams see an open mic that sends silence, so no "muted" badge, no "are you talking?" nag.
+- **Hold**: temporarily invert while the key is down. Push-to-talk while muted, quick mute while live.
+- **Native feel**: a menu bar icon next to the sound icon (click toggles it), a compact bezel under it in the style of the macOS 26 volume HUD, and a click sound.
+- **Always on**: it runs inside Hammerspoon, which starts at login. No app window, no dock icon.
 
-Runs inside Hammerspoon. Karabiner turns the physical F5 into F18.
+<p align="center">
+  <b>Microphone Muted</b> · slashed mic glyph in a dark card under the icon · <b>Microphone On</b>
+</p>
+
+## Why not just mute in Meet?
+
+Meet's own mute is a request to the app. mickey cuts the device: the mic is muted in CoreAudio, so every app gets silence at once, and switching tabs or apps changes nothing. It is the software equivalent of a hardware mute switch.
+
+## Requirements
+
+- A Mac whose F5 key carries the microphone symbol (MacBook Pro and MacBook Air from 2021 on; on older keyboards F5 is keyboard brightness).
+- macOS 14 or later. Tested on macOS 26.
+- [Hammerspoon](https://www.hammerspoon.org) — runs the Lua module. `brew install --cask hammerspoon`
+- [Karabiner-Elements](https://karabiner-elements.pqrs.org) — turns the physical 🎤 key into F18, which Hammerspoon can bind. `brew install --cask karabiner-elements`
+
+Both are free and open source. Give each the permissions it asks for on first launch (Accessibility for Hammerspoon, Input Monitoring and its driver for Karabiner), and enable "Launch at login" in both.
 
 ## Install
 
-```bash
-ln -sfn ~/projects/mickey/mickey.lua ~/.hammerspoon/mickey.lua
-printf '\nrequire("hs.ipc")\nmickey = require("mickey")\n' >> ~/.hammerspoon/init.lua
-```
+1. Clone anywhere and link the module into Hammerspoon:
 
-Karabiner, selected profile, `fn_function_keys`:
+   ```bash
+   git clone https://github.com/albert-mr/mickey.git
+   cd mickey
+   ln -sfn "$(pwd)/mickey.lua" ~/.hammerspoon/mickey.lua
+   printf '\nrequire("hs.ipc")\nmickey = require("mickey")\n' >> ~/.hammerspoon/init.lua
+   ```
 
-```json
-{"from": {"key_code": "f5"}, "to": [{"key_code": "f18"}]}
-```
+2. Map the 🎤 key to F18 in Karabiner-Elements. Either in the app: **Settings → Function Keys → f5 → f18**, or add this entry to `fn_function_keys` of your selected profile in `~/.config/karabiner/karabiner.json` (Karabiner reloads the file on its own):
 
-Reload Hammerspoon. Move any other app's hotkey (Wispr Flow) off the 🎤 key.
+   ```json
+   {"from": {"key_code": "f5"}, "to": [{"key_code": "f18"}]}
+   ```
 
-**macOS 26:** System Settings › Menu Bar › "Allow in the Menu Bar" must have
-Hammerspoon switched on. When it is off, none of Hammerspoon's menu bar items
-ever appear, with no error anywhere. The icon lands wherever macOS puts new
-items; ⌘-drag it once next to the sound icon and macOS remembers (the item has
-a fixed autosave name).
+   `fn+F5` stays a normal F5.
+
+3. Reload Hammerspoon (menu bar icon → Reload Config, or `hs -c 'hs.reload()'`). Tap 🎤. You should hear a click and see the bezel.
+
+4. If another app owns the 🎤 key (Wispr Flow, dictation tools), move its hotkey elsewhere in that app's settings.
+
+5. The menu bar icon appears wherever macOS puts new items. ⌘-drag it once next to the sound icon; macOS remembers, because the item has a fixed autosave name.
+
+### macOS 26 and later: "Allow in the Menu Bar"
+
+If no icon appears at all, open **System Settings → Menu Bar → Allow in the Menu Bar** and make sure **Hammerspoon** is switched on. When it is off, macOS silently blocks every menu bar item Hammerspoon creates, with no error anywhere.
 
 ## Tune
 
-Constants at the top of `mickey.lua`: `HOLD_MS`, `HUD_SECS`, `HUD_FADE`, `SOUND_MUTE`, `SOUND_LIVE`, `SOUND_VOL`, `HUD` geometry.
+Constants at the top of `mickey.lua`:
+
+| Constant | Default | Meaning |
+|---|---|---|
+| `HOLD_MS` | 250 | held longer than this counts as a hold, not a tap |
+| `HUD_SECS`, `HUD_FADE` | 2.0, 0.5 | how long the bezel stays, fade time |
+| `SOUND_MUTE`, `SOUND_LIVE`, `SOUND_VOL` | Bottle, Pop, 0.3 | click sounds from `/System/Library/Sounds`, volume |
+| `HUD` | 44 pt card, 14 pt corners, 11 pt gap | bezel geometry |
 
 ## Test
 
-`./check.sh` toggles the real mic and asserts the device followed. Hammerspoon must be running.
-The `hs` CLI blocks when stdin is a pipe; the script feeds it `/dev/null`.
+```bash
+./check.sh
+```
+
+Toggles the real mic a few times, drives the tap and hold paths, feeds the device-change handler a fake device, and asserts the hardware followed. It always puts the mic back in its starting state. Hammerspoon must be running.
+
+## How it works
+
+`mickey.lua` is about 190 lines of Lua:
+
+- `hs.hotkey.bind({}, "f18", onDown, onUp)`. Key-down flips the mic immediately, so a hold has no delay. Key-up reverts only if the key was held longer than `HOLD_MS`.
+- `hs.audiodevice` mutes the default input device with its mute flag, or sets input volume to 0 for devices without one and restores the previous level on unmute.
+- A watcher re-applies the state when the default input changes (AirPods connect), touching the new device only when it disagrees.
+- `hs.menubar` for the icon, `hs.canvas` for the bezel, `hs.sound` for the click. The mic glyph is drawn with canvas primitives because Hammerspoon cannot load SF Symbols.
+- On load it reads the real hardware state instead of assuming.
 
 ## Known limits
 
 - No background blur on the bezel (Hammerspoon cannot do vibrancy); it is near-opaque instead.
-- Bezel hangs under mickey's own menu bar icon; if the icon is not in the bar it sits near the right edge.
 - Devices without a mute flag are muted by setting input volume to 0; an app that auto-adjusts mic gain could raise it again.
-- The iPhone Continuity mic has neither, so it cannot be muted; mickey says so.
+- The iPhone Continuity microphone exposes neither a mute flag nor volume, so it cannot be muted; mickey says so.
 - Mute does not survive a reboot; the icon always shows the real state.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
