@@ -84,13 +84,16 @@ Two already-running programs, one new file.
   different one for live, at volume 0.3. Local output only; the call never
   hears it. Sound names are constants at the top of the file.
 
-- HUD: an `hs.canvas` bezel showing a mic icon (live) or mic-slash icon
-  (muted). Geometry, position, corner radius, translucency and fade timing
-  copy the native volume HUD of macOS 26 on this machine. Verified during
-  implementation by triggering a volume key from Hammerspoon and comparing
-  screenshots side by side, not from memory. Adapts to light/dark mode via
-  `hs.host.interfaceStyle()`. Shown on `hs.screen.mainScreen()`. Auto-hides
-  after the native delay; a new press restarts the timer.
+- HUD: an `hs.canvas` card hung 11 pt under mickey's own menu bar icon,
+  styled like the macOS 26 volume HUD (dark near-opaque card, 14 pt corners,
+  1 px edge) but one row: 18 pt mic glyph (slashed when muted) and a 13 pt
+  semibold label, "Microphone Muted" / "Microphone On". Width fits the text.
+  Stays 2.0 s, fades 0.5 s; a new press restarts the timer. Adapts to
+  light/dark via `hs.host.interfaceStyle()`. Measured against a real
+  volume-key screenshot on this Mac; the full slider was rejected as too
+  heavy for a binary state (user decision, 2026-09-27).
+- macOS 26 gate: System Settings › Menu Bar › "Allow in the Menu Bar" must
+  list Hammerspoon as on, or none of its items appear.
 - Menu bar: `hs.menubar` with a template image. `mic` when live,
   `mic.slash` when muted. Click toggles. No dropdown. User cmd-drags it once
   next to the sound icon; macOS remembers.

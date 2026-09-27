@@ -10,13 +10,14 @@ local HUD_FADE   = 0.5
 local SOUND_VOL  = 0.3
 local SOUND_MUTE = "/System/Library/Sounds/Bottle.aiff"
 local SOUND_LIVE = "/System/Library/Sounds/Pop.aiff"
--- bezel geometry, measured from the native macOS 26 volume HUD on this Mac:
--- 290x64 card, 16pt corners, 11pt below the menu bar, centered under its menu bar icon
-local HUD = { w = 290, h = 64, radius = 16, gap = 11, pad = 14 }
+-- bezel: one-row card under the menu bar icon, same material/corners/offset as the
+-- macOS 26 volume HUD (16 pt corners on 64 pt; scaled to 44 pt), measured on this Mac
+local HUD = { h = 44, radius = 14, gap = 11, pad = 14, icon = 18 }
 
 M.muted = false
 local savedVolume   -- for devices with no mute flag
 local downAt        -- hs.timer.absoluteTime() at key-down
+local bar           -- menu bar item, created below
 
 ---------------------------------------------------------------- mute engine
 local function dev() return hs.audiodevice.defaultInputDevice() end
@@ -85,61 +86,50 @@ local function micElements(x, y, s, fg, bg, muted)
   return el
 end
 
--- Where the bezel hangs from: centered under the Sound menu bar icon, like Apple's.
--- Returns center x, top y, in global coordinates.
+-- Center x of our menu bar icon and the y just under the menu bar of that screen.
 local function anchor()
-  local ok, r = pcall(function()
-    local extras = hs.axuielement.applicationElement(hs.application.get("Control Center")):attributeValue("AXExtrasMenuBar")
-    for _, c in ipairs(extras:attributeValue("AXChildren")) do
-      if c:attributeValue("AXDescription") == "Sound" then return c:attributeValue("AXFrame") end
-    end
-  end)
-  r = ok and r or nil
-  local scr = (r and hs.screen.find(hs.geometry.point(r.x + r.w / 2, r.y + r.h / 2))) or hs.screen.mainScreen()
-  local f = scr:frame()
-  local cx = r and (r.x + r.w / 2) or (f.x + f.w - HUD.w / 2 - HUD.pad)
-  return cx, f.y + HUD.gap
+  local f = bar:frame()
+  if not f or f.x <= 0 then   -- item not in the bar: see README, "Allow in the Menu Bar"
+    local s = hs.screen.mainScreen():frame()
+    return s.x + s.w - 120, s.y + HUD.gap
+  end
+  local cx, scr, best = f.x + f.w / 2, hs.screen.mainScreen(), math.huge
+  for _, sc in ipairs(hs.screen.allScreens()) do   -- the screen whose top edge holds the item
+    local ff = sc:fullFrame()
+    if cx >= ff.x and cx <= ff.x + ff.w and math.abs(ff.y - f.y) < best then scr, best = sc, math.abs(ff.y - f.y) end
+  end
+  return cx, scr:frame().y + HUD.gap
 end
 
 local hud, hudTimer
 local function showHUD(label)
   local dark = hs.host.interfaceStyle() == "Dark"
   local fg = dark and { white = 1 } or { white = 0.1 }
-  local dim = dark and { white = 1, alpha = 0.35 } or { white = 0, alpha = 0.3 }
-  local bg = dark and { white = 0.15, alpha = 0.98 } or { white = 0.95, alpha = 0.98 }   -- ponytail: opaque-ish, hs.canvas cannot blur
+  local bg = dark and { white = 0.15, alpha = 0.98 } or { white = 0.95, alpha = 0.98 }   -- ponytail: near-opaque, hs.canvas cannot blur
   local edge = dark and { white = 1, alpha = 0.12 } or { white = 0, alpha = 0.1 }
+  local font = { name = ".AppleSystemUIFontDemi", size = 13 }
+  local text = label or (M.muted and "Microphone Muted" or "Microphone On")
+  local tw = hs.drawing.getTextDrawingSize(hs.styledtext.new(text, { font = font })).w
+  local tx = HUD.pad + HUD.icon + 8
+  local w = math.ceil(tx + tw + HUD.pad)
   local cx, top = anchor()
   if hudTimer then hudTimer:stop() end
   if hud then hud:delete() end
-  hud = hs.canvas.new({ x = cx - HUD.w / 2, y = top, w = HUD.w, h = HUD.h })
+  hud = hs.canvas.new({ x = cx - w / 2, y = top, w = w, h = HUD.h })
   hud:level(hs.canvas.windowLevels.overlay)
   hud:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "fullScreenAuxiliary" })
-  local d = dev()
-  local title = label or (d and d:name()) or "Microphone"
-  hud[#hud + 1] = { type = "rectangle", fillColor = bg, strokeColor = edge, strokeWidth = 1,
-                    frame = { x = 0.5, y = 0.5, w = HUD.w - 1, h = HUD.h - 1 },
-                    roundedRectRadii = { xRadius = HUD.radius, yRadius = HUD.radius } }
-  hud[#hud + 1] = { type = "text", text = title, textColor = fg, textSize = 13, textFont = ".AppleSystemUIFontDemi",
-                    frame = { x = HUD.pad, y = 9, w = HUD.w - 2 * HUD.pad, h = 18 } }
-  -- slider row, like the volume HUD: small icon, track, big icon. full = live, empty = muted.
-  local ty, x0, x1 = 41, 30, 249   -- bar center line and track extents, measured
-  for _, e in ipairs(micElements(HUD.pad - 1, ty - 5.5, 11, fg, bg, false)) do hud[#hud + 1] = e end
-  for i = 0, 15 do
-    local x = x0 + (x1 - x0) * i / 15
-    hud[#hud + 1] = { type = "circle", center = { x = x, y = ty + 5 }, radius = 0.9, fillColor = dim, strokeColor = { alpha = 0 } }
-  end
-  if not M.muted then
-    hud[#hud + 1] = { type = "rectangle", fillColor = fg, strokeColor = { alpha = 0 },
-                      frame = { x = x0, y = ty - 2.5, w = x1 - x0, h = 5 },
-                      roundedRectRadii = { xRadius = 2.5, yRadius = 2.5 } }
-  end
-  for _, e in ipairs(micElements(HUD.w - HUD.pad - 20, ty - 10, 20, fg, bg, M.muted)) do hud[#hud + 1] = e end
+  hud[1] = { type = "rectangle", fillColor = bg, strokeColor = edge, strokeWidth = 1,
+             frame = { x = 0.5, y = 0.5, w = w - 1, h = HUD.h - 1 },
+             roundedRectRadii = { xRadius = HUD.radius, yRadius = HUD.radius } }
+  for _, e in ipairs(micElements(HUD.pad, (HUD.h - HUD.icon) / 2, HUD.icon, fg, bg, M.muted)) do hud[#hud + 1] = e end
+  hud[#hud + 1] = { type = "text", text = text, textColor = fg, textSize = 13, textFont = font.name,
+                    frame = { x = tx, y = (HUD.h - 18) / 2, w = tw + 4, h = 18 } }
   hud:show()
   hudTimer = hs.timer.doAfter(HUD_SECS, function() hud:hide(HUD_FADE) end)
   M.hud = hud   -- exposed for tests/debug
 end
 
-local bar = hs.menubar.new(true, "mickey"); M.bar = bar   -- named so macOS remembers where you drag it; exposed for tests/debug
+bar = hs.menubar.new(true, "mickey"); M.bar = bar   -- named so macOS remembers where you drag it; exposed for tests/debug
 local function barIcon()
   local img = hs.image.imageFromName(M.muted and "mic.slash" or "mic")
   if not img then  -- no SF Symbols in this Hammerspoon: draw it
