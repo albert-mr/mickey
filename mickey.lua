@@ -84,9 +84,27 @@ local function micElements(x, y, s, fg, bg, muted)
   return el
 end
 
--- Replaced by the canvas bezel in Task 3.
+local hud, hudTimer
 local function showHUD(label)
-  hs.alert.show(label or (M.muted and "Mic muted" or "Mic live"), 1)
+  local dark = hs.host.interfaceStyle() == "Dark"
+  local fg = dark and { white = 1 } or { white = 0.1 }
+  local bg = dark and { white = 0.2, alpha = 0.92 } or { white = 0.96, alpha = 0.92 }
+  local f = hs.screen.mainScreen():frame()
+  if hudTimer then hudTimer:stop() end
+  if hud then hud:delete() end
+  hud = hs.canvas.new({ x = f.x + f.w - HUD.w - HUD.right, y = f.y + HUD.top, w = HUD.w, h = HUD.h })
+  hud:level(hs.canvas.windowLevels.overlay)
+  hud:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "fullScreenAuxiliary" })
+  hud[1] = { type = "rectangle", fillColor = bg, strokeColor = { alpha = 0 },
+             roundedRectRadii = { xRadius = HUD.radius, yRadius = HUD.radius } }
+  local s = HUD.h * 0.6
+  for _, e in ipairs(micElements(HUD.h * 0.35, (HUD.h - s) / 2, s, fg, bg, M.muted)) do hud[#hud + 1] = e end
+  hud[#hud + 1] = { type = "text", text = label or (M.muted and "Mic muted" or "Mic live"),
+                    textColor = fg, textSize = 13,
+                    frame = { x = HUD.h * 1.1, y = (HUD.h - 17) / 2, w = HUD.w - HUD.h * 1.2, h = 18 } }
+  hud:show()
+  hudTimer = hs.timer.doAfter(HUD_SECS, function() hud:hide(HUD_FADE) end)
+  M.hud = hud   -- exposed for tests/debug
 end
 
 local bar = hs.menubar.new(); M.bar = bar   -- exposed for tests/debug
