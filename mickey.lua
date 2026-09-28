@@ -11,7 +11,7 @@ local SOUND_VOL  = 0.3
 local SOUND_MUTE = "/System/Library/Sounds/Bottle.aiff"
 local SOUND_LIVE = "/System/Library/Sounds/Pop.aiff"
 -- bezel: one-row card under the menu bar icon, same material/corners/offset as the
--- macOS 26 volume HUD (16 pt corners on 64 pt; scaled to 44 pt), measured on this Mac
+-- macOS 26 volume HUD (16 pt corners on 64 pt; scaled to 44 pt), measured from a screenshot
 local HUD = { h = 44, radius = 14, gap = 11, pad = 14, icon = 18 }
 
 M.muted = false

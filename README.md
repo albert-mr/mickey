@@ -45,7 +45,7 @@ Both are free and open source. Give each the permissions it asks for on first la
 
 3. Reload Hammerspoon (menu bar icon → Reload Config, or `hs -c 'hs.reload()'`). Tap 🎤. You should hear a click and see the bezel.
 
-4. If another app owns the 🎤 key (Wispr Flow, dictation tools), move its hotkey elsewhere in that app's settings.
+4. If another app already reacts to the 🎤 key (a dictation or push-to-talk tool), move its hotkey elsewhere in that app's settings.
 
 5. The menu bar icon appears wherever macOS puts new items. ⌘-drag it once next to the sound icon; macOS remembers, because the item has a fixed autosave name.
 
