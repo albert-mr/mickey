@@ -1,0 +1,19 @@
+#!/bin/bash
+# mickey CLI. Talks to the module inside Hammerspoon over hs.ipc.
+# -A launches Hammerspoon if it is not running. </dev/null: hs hangs on a piped stdin.
+lua() { hs -A -q -t 15 -c "$1" < /dev/null; }
+# hs fails at once while Hammerspoon is starting or reloading: poll up to 15 s.
+ready() { for _ in $(seq 30); do lua 'return 1' >/dev/null 2>&1 && return; sleep 0.5; done
+          echo "mickey: Hammerspoon does not answer (is hs.ipc loaded in ~/.hammerspoon/init.lua?)" >&2; exit 69; }
+usage="usage: mickey [status|mute|unmute|toggle|up]   (no argument = up)"
+case "${1:-up}" in
+  status) ready; lua 'return mickey.status()' ;;
+  mute)   ready; lua 'mickey.set(true);  return mickey.status()' ;;
+  unmute) ready; lua 'mickey.set(false); return mickey.status()' ;;
+  toggle) ready; lua 'mickey.set(not mickey.muted); return mickey.status()' ;;
+  up)     ready; lua 'return mickey ~= nil' | grep -q true || { lua 'hs.reload()' 2>/dev/null; ready; }
+          pgrep -q Karabiner-Core-Service || echo "warning: Karabiner is not running, the 🎤 key is dead" >&2
+          lua 'return mickey.status()' ;;
+  -h|--help|help) echo "$usage" ;;
+  *)      echo "$usage" >&2; exit 1 ;;
+esac

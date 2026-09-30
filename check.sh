@@ -29,4 +29,18 @@ if not ok then error(err, 0) end
 print("mickey check: OK (muted=" .. tostring(start) .. ")")
 ' 2>&1 < /dev/null)
 echo "$out"
-echo "$out" | grep -q "mickey check: OK"
+echo "$out" | grep -q "mickey check: OK" || exit 1
+
+# CLI: the same module through the `mickey` script. Restores the start state on failure.
+cli="$(dirname "$0")/mickey"
+start=$("$cli" status) || exit 1
+restore() { if [ "$start" = muted ]; then "$cli" mute >/dev/null; else "$cli" unmute >/dev/null; fi; }
+fail() { echo "mickey cli: FAIL: $1"; restore; exit 1; }
+[ "$("$cli" mute)"   = muted ] || fail "mute did not print muted"
+[ "$("$cli" unmute)" = live ]  || fail "unmute did not print live"
+[ "$("$cli" toggle)" = muted ] || fail "toggle did not print muted"
+[ "$("$cli" status)" = "$(hs -c 'return mickey.readState() and "muted" or "live"' < /dev/null)" ] || fail "status disagrees with readState"
+[ "$("$cli" up)"     = muted ] || fail "up did not print the state"
+restore
+[ "$("$cli" status)" = "$start" ] || fail "restore failed"
+echo "mickey cli: OK"

@@ -45,6 +45,11 @@ local function stateOf(d)
   return (d:inputVolume() or 1) == 0
 end
 function M.readState() return stateOf(dev()) end
+-- One word for the CLI: muted | live | no-mic
+function M.status()
+  local d = dev()
+  return not d and "no-mic" or stateOf(d) and "muted" or "live"
+end
 
 ---------------------------------------------------------------- feedback
 local sounds = {}
