@@ -6,6 +6,7 @@ Turn the 🎤 key (F5) on your MacBook into a real microphone switch.
 - **Hold**: temporarily invert while the key is down. Push-to-talk while muted, quick mute while live.
 - **Native feel**: a menu bar icon next to the sound icon (click toggles it), a compact bezel under it in the style of the macOS 26 volume HUD, and a click sound.
 - **Always on**: it runs inside Hammerspoon, which starts at login. No app window, no dock icon.
+- **Scriptable**: `mickey mute`, `mickey unmute`, `mickey status` from the terminal, for scripts and agents.
 
 <p align="center">
   <img src="docs/bezel.png" width="400" alt="menu bar with a slashed mic icon and, under it, a dark card reading Microphone Muted">
@@ -26,12 +27,13 @@ Both are free and open source. Give each the permissions it asks for on first la
 
 ## Install
 
-1. Clone anywhere and link the module into Hammerspoon:
+1. Clone anywhere, link the module into Hammerspoon and the `mickey` command into your PATH:
 
    ```bash
    git clone https://github.com/albert-mr/mickey.git
    cd mickey
    ln -sfn "$(pwd)/mickey.lua" ~/.hammerspoon/mickey.lua
+   ln -sfn "$(pwd)/mickey" ~/.local/bin/mickey   # or any directory on your PATH
    printf '\nrequire("hs.ipc")\nmickey = require("mickey")\n' >> ~/.hammerspoon/init.lua
    ```
 
@@ -53,6 +55,20 @@ Both are free and open source. Give each the permissions it asks for on first la
 
 If no icon appears at all, open **System Settings → Menu Bar → Allow in the Menu Bar** and make sure **Hammerspoon** is switched on. When it is off, macOS silently blocks every menu bar item Hammerspoon creates, with no error anywhere.
 
+## Control from the terminal
+
+The `mickey` command talks to the module inside Hammerspoon. If Hammerspoon is not running, it starts it.
+
+```bash
+mickey            # make sure it is running, print the state
+mickey status     # muted | live | no-mic
+mickey mute       # idempotent; prints the resulting state
+mickey unmute
+mickey toggle
+```
+
+Made for scripts and agents: one word on stdout, exit 0 when it worked, non-zero when Hammerspoon does not answer. Muting from the terminal shows the bezel and plays the click, like a key press.
+
 ## Tune
 
 Constants at the top of `mickey.lua`:
@@ -70,7 +86,7 @@ Constants at the top of `mickey.lua`:
 ./check.sh
 ```
 
-Toggles the real mic a few times, drives the tap and hold paths, feeds the device-change handler a fake device, and asserts the hardware followed. It always puts the mic back in its starting state. Hammerspoon must be running.
+Toggles the real mic a few times, drives the tap and hold paths, feeds the device-change handler a fake device, asserts the hardware followed, then does the same through the `mickey` command. It always puts the mic back in its starting state. Hammerspoon must be running.
 
 ## How it works
 
@@ -81,6 +97,7 @@ Toggles the real mic a few times, drives the tap and hold paths, feeds the devic
 - A watcher re-applies the state when the default input changes (AirPods connect), touching the new device only when it disagrees.
 - `hs.menubar` for the icon, `hs.canvas` for the bezel, `hs.sound` for the click. The mic glyph is drawn with canvas primitives because Hammerspoon cannot load SF Symbols.
 - On load it reads the real hardware state instead of assuming.
+- The `mickey` command is a short bash script: each subcommand is one `hs -c` call over `hs.ipc`, with `-A` to relaunch Hammerspoon and a short poll while it starts or reloads.
 
 ## Known limits
 
