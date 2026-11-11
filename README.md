@@ -1,6 +1,6 @@
-# mickey 🐭🎤
+# mickey
 
-**mic + key.** Turn the 🎤 key (F5) on your MacBook into a real microphone switch. No relation to the mouse, though both have good ears.
+Turn the 🎤 key (F5) on your MacBook into a real microphone switch.
 
 <p align="center">
   <img src="docs/demo.gif" width="420" alt="In a menu bar, a slash draws itself across a mic icon while a glass capsule reading Mic Muted pops out under it; the capsule then changes to Mic On and folds back into the icon">
@@ -126,10 +126,6 @@ Toggles the real mic a few times, drives the tap and hold paths, feeds the devic
 - The iPhone Continuity microphone exposes neither a mute flag nor volume, so it cannot be muted; mickey says so.
 - Mute does not survive a reboot; the icon always shows the real state.
 
-## The name
-
-mic + key. Say it fast. Any resemblance to a certain mouse is purely phonetic, and this one only squeaks when you press it. No mice were muted in the making of this project.
-
 ## License
 
-MIT. See [LICENSE](LICENSE). Not affiliated with any mouse, famous or otherwise.
+MIT. See [LICENSE](LICENSE).
